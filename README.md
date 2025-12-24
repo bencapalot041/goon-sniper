@@ -1,2 +1,1 @@
-# goon-sniper
-pet sniper
+# snipe
