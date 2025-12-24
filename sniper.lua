@@ -4,8 +4,9 @@
 getgenv().SniperEnabled = getgenv().SniperEnabled or false
 
 local Rayfield = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua"
+    "https://raw.githubusercontent.com/7GrandDadPGN/Rayfield-UI-Library/main/source.lua"
 ))()
+
 
 local Window = Rayfield:CreateWindow({
     Name = "GOON SNIPER",
