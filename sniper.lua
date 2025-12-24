@@ -59,7 +59,7 @@ end
 -- LOAD OBSIDIAN (CORRECT API)
 -- =====================
 local Obsidian = loadstring(game:HttpGet(
-	"https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Example.lua"
+	"https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"
 ))()
 
 local Window = Obsidian:CreateWindow("GOON SNIPER")
