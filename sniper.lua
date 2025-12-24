@@ -1,97 +1,121 @@
 -- =====================
--- RAYFIELD UI (MOBILE SAFE)
+-- OBSIDIAN UI (MOBILE SAFE)
+-- =====================
+local Obsidian = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"
+))()
+-- =====================
+-- OBSIDIAN WINDOW
 -- =====================
 getgenv().SniperEnabled = getgenv().SniperEnabled or false
 
-local Rayfield = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/7GrandDadPGN/Rayfield-UI-Library/main/source.lua"
-))()
-
-
-local Window = Rayfield:CreateWindow({
-    Name = "GOON SNIPER",
-    LoadingTitle = "GOON SNIPER",
-    LoadingSubtitle = "Mobile Safe Rayfield UI",
-    ConfigurationSaving = {
-        Enabled = false
-    }
+local Window = Obsidian:CreateWindow({
+    Title = "GOON SNIPER",
+    Footer = "Mobile Safe • Obsidian UI",
+    Theme = "Dark",
+    Size = UDim2.fromOffset(520, 420)
 })
 
--- MAIN TAB
-local MainTab = Window:CreateTab("Main", 4483362458)
+-- =====================
+-- TABS
+-- =====================
+local MainTab    = Window:AddTab("Main")
+local FiltersTab = Window:AddTab("Filters")
+local SafetyTab  = Window:AddTab("Safety")
+local SettingsTab= Window:AddTab("Settings")
 
-MainTab:CreateToggle({
-    Name = "Sniper Enabled",
-    CurrentValue = getgenv().SniperEnabled,
-    Callback = function(Value)
-        getgenv().SniperEnabled = Value
+-- =====================
+-- MAIN TAB
+-- =====================
+local StatusLabel = MainTab:AddLabel("Status: IDLE")
+
+MainTab:AddToggle({
+    Text = "Sniper Enabled",
+    Default = getgenv().SniperEnabled,
+    Callback = function(v)
+        getgenv().SniperEnabled = v
+        StatusLabel:Set("Status: " .. (v and "SCANNING" or "IDLE"))
     end
 })
 
-local StatusLabel = MainTab:CreateParagraph({
-    Title = "Status",
-    Content = "IDLE"
-})
-
+-- =====================
 -- FILTERS TAB
-local FiltersTab = Window:CreateTab("Filters", 4483362458)
-
+-- =====================
 local SelectedPet = ALL_PETS[1]
 
-FiltersTab:CreateDropdown({
-    Name = "Pet",
-    Options = ALL_PETS,
-    CurrentOption = { SelectedPet },
-    Callback = function(Option)
-        SelectedPet = Option[1]
+FiltersTab:AddDropdown({
+    Text = "Pet",
+    List = ALL_PETS,
+    Default = SelectedPet,
+    Callback = function(v)
+        SelectedPet = v
+        local cfg = Config.Pets[SelectedPet]
+        if cfg then
+            MinWeightBox:SetText(tostring(cfg.MinWeight or ""))
+            MaxPriceBox:SetText(tostring(cfg.MaxPrice or ""))
+        else
+            MinWeightBox:SetText("")
+            MaxPriceBox:SetText("")
+        end
     end
 })
 
-FiltersTab:CreateInput({
-    Name = "Minimum Weight",
-    PlaceholderText = "e.g. 25",
-    Callback = function(Value)
-        Value = tonumber(Value)
-        if Value and SelectedPet then
+local MinWeightBox = FiltersTab:AddInput({
+    Text = "Minimum Weight",
+    Placeholder = "e.g. 25",
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and SelectedPet then
             Config.Pets[SelectedPet] = Config.Pets[SelectedPet] or {}
-            Config.Pets[SelectedPet].MinWeight = Value
+            Config.Pets[SelectedPet].MinWeight = n
             SaveConfig()
         end
     end
 })
 
-FiltersTab:CreateInput({
-    Name = "Maximum Price",
-    PlaceholderText = "e.g. 500",
-    Callback = function(Value)
-        Value = tonumber(Value)
-        if Value and SelectedPet then
+local MaxPriceBox = FiltersTab:AddInput({
+    Text = "Maximum Price",
+    Placeholder = "e.g. 500",
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and SelectedPet then
             Config.Pets[SelectedPet] = Config.Pets[SelectedPet] or {}
-            Config.Pets[SelectedPet].MaxPrice = Value
+            Config.Pets[SelectedPet].MaxPrice = n
             SaveConfig()
         end
     end
 })
 
+-- =====================
 -- SAFETY TAB
-local SafetyTab = Window:CreateTab("Safety", 4483362458)
-
-SafetyTab:CreateToggle({
-    Name = "Safety Mode",
-    CurrentValue = Config.SafetyMode,
-    Callback = function(Value)
-        Config.SafetyMode = Value
+-- =====================
+SafetyTab:AddToggle({
+    Text = "Safety Mode",
+    Default = Config.SafetyMode,
+    Callback = function(v)
+        Config.SafetyMode = v
         SaveConfig()
     end
 })
 
+-- =====================
 -- SETTINGS TAB
-local SettingsTab = Window:CreateTab("Settings", 4483362458)
-
-SettingsTab:CreateParagraph({
-    Title = "Info",
-    Content = "Rayfield UI loaded successfully.\nMobile Safe."
+-- =====================
+SettingsTab:AddLabel("Obsidian UI loaded successfully.")
+SettingsTab:AddButton({
+    Text = "Reset Filters (Selected Pet)",
+    Callback = function()
+        if SelectedPet then
+            Config.Pets[SelectedPet] = nil
+            SaveConfig()
+            MinWeightBox:SetText("")
+            MaxPriceBox:SetText("")
+        end
+    end
 })
-
--- Example status update
-StatusLabel:Set({ Content = "SCANNING" })
+-- Example inside your loop
+if getgenv().SniperEnabled then
+    StatusLabel:Set("Status: SCANNING")
+else
+    StatusLabel:Set("Status: IDLE")
+end
