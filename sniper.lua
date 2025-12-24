@@ -1,5 +1,5 @@
 -- =====================================================
--- GOON SNIPER — OBSIDIAN UI (ANDROID SAFE)
+-- GOON SNIPER — OBSIDIAN UI (EXAMPLE.LUA API)
 -- =====================================================
 
 -- ===== MOBILE SAFE BOOT =====
@@ -13,13 +13,14 @@ task.wait(1)
 -- ===== SERVICES =====
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
+local VirtualUser = game:GetService("VirtualUser")
 
 -- ===== CONSTANTS =====
 local TradeWorldID = 129954712878723
 local CONFIG_FILE = "goon_sniper_config.json"
 
--- ===== GLOBAL STATE =====
-getgenv().SniperEnabled = getgenv().SniperEnabled or false
+-- ===== STATE =====
+getgenv().SniperEnabled = false
 local AutoHop = false
 local LastHit = os.clock()
 
@@ -35,18 +36,12 @@ local ALL_PETS = {
 }
 
 -- ===== CONFIG =====
-local Config = {
-	Pets = {},        -- [pet] = { MinWeight, MaxPrice }
-	SafetyMode = true
-}
+local Config = { Pets = {}, SafetyMode = true }
 
 if isfile and isfile(CONFIG_FILE) then
-	local ok, data = pcall(function()
-		return HttpService:JSONDecode(readfile(CONFIG_FILE))
+	pcall(function()
+		Config = HttpService:JSONDecode(readfile(CONFIG_FILE))
 	end)
-	if ok and data then
-		Config = data
-	end
 end
 
 local function SaveConfig()
@@ -57,200 +52,105 @@ end
 
 -- ===== HELPERS =====
 local EnabledPets = {}
+local SelectedPet = ALL_PETS[1]
 
-local function IsPetActive(pet)
-	local c = Config.Pets[pet]
+local function IsPetActive(p)
+	local c = Config.Pets[p]
 	return c and c.MinWeight and c.MaxPrice and c.MinWeight > 0 and c.MaxPrice > 0
 end
 
--- ===== LOAD OBSIDIAN UI =====
+-- ===== LOAD OBSIDIAN (MATCH EXAMPLE.LUA) =====
 local Obsidian = loadstring(game:HttpGet(
-	"https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"
+	"https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Example.lua"
 ))()
 
--- ===== WINDOW =====
-local Window = Obsidian:CreateWindow({
-	Title = "GOON SNIPER",
-	Footer = "Mobile Safe • Obsidian UI",
-	Theme = "Dark",
-	Size = UDim2.fromOffset(520, 420)
-})
+local Window = Obsidian:CreateWindow("GOON SNIPER")
 
--- ===== TABS =====
-local MainTab     = Window:AddTab("Main")
-local FiltersTab  = Window:AddTab("Filters")
-local SafetyTab   = Window:AddTab("Safety")
-local SettingsTab = Window:AddTab("Settings")
+local MainTab     = Window:CreateTab("Main")
+local FiltersTab  = Window:CreateTab("Filters")
+local SafetyTab   = Window:CreateTab("Safety")
+local SettingsTab = Window:CreateTab("Settings")
 
--- =====================================================
--- MAIN TAB
--- =====================================================
-local StatusLabel = MainTab:AddParagraph({
-	Title = "Status",
-	Content = "IDLE"
-})
+-- ===== MAIN TAB =====
+local StatusText = MainTab:AddText("Status: IDLE")
 
-MainTab:AddToggle({
-	Text = "Sniper Enabled",
-	Default = getgenv().SniperEnabled,
-	Callback = function(v)
-		getgenv().SniperEnabled = v
-		StatusLabel:Set({
-			Title = "Status",
-			Content = v and "SCANNING" or "IDLE"
-		})
+MainTab:AddToggle("Sniper Enabled", function(v)
+	getgenv().SniperEnabled = v
+	StatusText.Text = "Status: " .. (v and "SCANNING" or "IDLE")
+end)
+
+-- ===== FILTERS TAB =====
+FiltersTab:AddDropdown("Enabled Pets", ALL_PETS, true, function(list)
+	EnabledPets = {}
+	for _, p in ipairs(list) do
+		EnabledPets[p] = true
 	end
-})
+end)
 
--- =====================================================
--- FILTERS TAB
--- =====================================================
-local SelectedPet = ALL_PETS[1]
+FiltersTab:AddDropdown("Edit Pet", ALL_PETS, false, function(p)
+	SelectedPet = p
+end)
 
-FiltersTab:AddDropdown({
-	Text = "Pets (Multi-Select)",
-	List = ALL_PETS,
-	Multi = true,
-	Callback = function(list)
-		EnabledPets = {}
-		for _, p in ipairs(list) do
-			EnabledPets[p] = true
-		end
-		RefreshPetStatus()
-	end
-})
-
-FiltersTab:AddDropdown({
-	Text = "Edit Pet",
-	List = ALL_PETS,
-	Default = SelectedPet,
-	Callback = function(p)
-		SelectedPet = p
-		local c = Config.Pets[p]
-		MinWeightBox:SetText(c and tostring(c.MinWeight or "") or "")
-		MaxPriceBox:SetText(c and tostring(c.MaxPrice or "") or "")
-		RefreshPetStatus()
-	end
-})
-
-local MinWeightBox = FiltersTab:AddInput({
-	Text = "Minimum Weight",
-	Placeholder = "e.g. 25",
-	Callback = function(v)
-		local n = tonumber(v)
-		if n and SelectedPet then
-			Config.Pets[SelectedPet] = Config.Pets[SelectedPet] or {}
-			Config.Pets[SelectedPet].MinWeight = n
-			SaveConfig()
-			RefreshPetStatus()
-		end
-	end
-})
-
-local MaxPriceBox = FiltersTab:AddInput({
-	Text = "Maximum Price",
-	Placeholder = "e.g. 500",
-	Callback = function(v)
-		local n = tonumber(v)
-		if n and SelectedPet then
-			Config.Pets[SelectedPet] = Config.Pets[SelectedPet] or {}
-			Config.Pets[SelectedPet].MaxPrice = n
-			SaveConfig()
-			RefreshPetStatus()
-		end
-	end
-})
-
-local StatusList = FiltersTab:AddParagraph({
-	Title = "Pet Status",
-	Content = "No pets selected"
-})
-
-function RefreshPetStatus()
-	local lines = {}
-	for pet in pairs(EnabledPets) do
-		if IsPetActive(pet) then
-			table.insert(lines, "🟢 "..pet.." (ACTIVE)")
-		else
-			table.insert(lines, "🔴 "..pet.." (INACTIVE)")
-		end
-	end
-	StatusList:Set({
-		Title = "Pet Status",
-		Content = #lines > 0 and table.concat(lines, "\n") or "No pets selected"
-	})
-end
-
--- =====================================================
--- SAFETY TAB
--- =====================================================
-SafetyTab:AddToggle({
-	Text = "Safety Mode",
-	Default = Config.SafetyMode,
-	Callback = function(v)
-		Config.SafetyMode = v
+FiltersTab:AddInput("Min Weight", function(v)
+	local n = tonumber(v)
+	if n then
+		Config.Pets[SelectedPet] = Config.Pets[SelectedPet] or {}
+		Config.Pets[SelectedPet].MinWeight = n
 		SaveConfig()
 	end
-})
+end)
 
--- =====================================================
--- SETTINGS TAB
--- =====================================================
-SettingsTab:AddButton({
-	Text = "Hop Server Now",
-	Callback = function()
-		TeleportService:Teleport(TradeWorldID, Player)
+FiltersTab:AddInput("Max Price", function(v)
+	local n = tonumber(v)
+	if n then
+		Config.Pets[SelectedPet] = Config.Pets[SelectedPet] or {}
+		Config.Pets[SelectedPet].MaxPrice = n
+		SaveConfig()
 	end
-})
+end)
 
-SettingsTab:AddToggle({
-	Text = "Auto Hop (No hits for 60s)",
-	Default = false,
-	Callback = function(v)
-		AutoHop = v
+local PetStatusText = FiltersTab:AddText("Pet Status:\nNone")
+
+local function RefreshPetStatus()
+	local lines = {}
+	for p in pairs(EnabledPets) do
+		table.insert(lines, (IsPetActive(p) and "🟢 " or "🔴 ") .. p)
 	end
-})
-
-SettingsTab:AddParagraph({
-	Title = "Info",
-	Content = "Obsidian UI loaded successfully."
-})
-
--- =====================================================
--- NOTIFICATIONS
--- =====================================================
-local function NotifySnipe(pet, weight, price)
-	Obsidian:Notify({
-		Title = "SNIPED!",
-		Description = pet..
-			"\nWeight: "..tostring(weight)..
-			"\nPrice: "..tostring(price),
-		Duration = 6
-	})
+	PetStatusText.Text = "Pet Status:\n" .. (#lines > 0 and table.concat(lines, "\n") or "None")
 end
 
--- =====================================================
--- MAIN LOOP (HOOK YOUR REAL SNIPER HERE)
--- =====================================================
+-- ===== SAFETY TAB =====
+SafetyTab:AddToggle("Safety Mode", function(v)
+	Config.SafetyMode = v
+	SaveConfig()
+end)
+
+-- ===== SETTINGS TAB =====
+SettingsTab:AddButton("Hop Server Now", function()
+	TeleportService:Teleport(TradeWorldID, Player)
+end)
+
+SettingsTab:AddToggle("Auto Hop (60s)", function(v)
+	AutoHop = v
+end)
+
+SettingsTab:AddText("Obsidian UI loaded successfully.")
+
+-- ===== LOOP =====
 task.spawn(function()
 	while task.wait(1) do
 		if getgenv().SniperEnabled then
-			StatusLabel:Set({ Title="Status", Content="SCANNING" })
-
+			RefreshPetStatus()
 			if AutoHop and os.clock() - LastHit > 60 then
 				TeleportService:Teleport(TradeWorldID, Player)
 				LastHit = os.clock()
 			end
-		else
-			StatusLabel:Set({ Title="Status", Content="IDLE" })
 		end
 	end
 end)
 
--- =====================================================
--- ANTI-AFK
--- =====================================================
+-- ===== ANTI AFK =====
 Player.Idled:Connect(function()
-	game:GetService("VirtualUser"):CaptureController()
-	game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+	VirtualUser:CaptureController()
+	VirtualUser:ClickButton2(Vector2.new())
 end)
