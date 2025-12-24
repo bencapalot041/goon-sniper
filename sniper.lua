@@ -1,22 +1,25 @@
 -- =====================================================
--- GOON SNIPER — OBSIDIAN UI (STABLE / ANDROID SAFE)
+-- GOON SNIPER — FINAL STABLE UI (NO LIBRARIES)
 -- =====================================================
 
 repeat task.wait() until game:IsLoaded()
+
+-- =====================
+-- SERVICES
+-- =====================
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
-repeat task.wait() until Player and Player:FindFirstChild("PlayerGui")
-
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local VirtualUser = game:GetService("VirtualUser")
 
+repeat task.wait() until Player:FindFirstChild("PlayerGui")
+
+-- =====================
+-- CONSTANTS
+-- =====================
 local TradeWorldID = 129954712878723
 local CONFIG_FILE = "goon_sniper_config.json"
-
-getgenv().SniperEnabled = false
-local AutoHop = false
-local LastHit = os.clock()
 
 -- =====================
 -- PET LIST
@@ -34,7 +37,13 @@ local ALL_PETS = {
 -- =====================
 -- CONFIG
 -- =====================
-local Config = { Pets = {}, SafetyMode = true }
+local Config = {
+	Pets = {},
+	EnabledPets = {},
+	SafetyMode = true,
+	AutoHop = false
+}
+
 if isfile and isfile(CONFIG_FILE) then
 	pcall(function()
 		Config = HttpService:JSONDecode(readfile(CONFIG_FILE))
@@ -47,53 +56,102 @@ local function SaveConfig()
 	end
 end
 
-local EnabledPets = {}
+-- =====================
+-- STATE
+-- =====================
+getgenv().SniperEnabled = false
 local SelectedPet = ALL_PETS[1]
+local LastHit = os.clock()
 
-local function IsPetActive(p)
-	local c = Config.Pets[p]
+local function IsPetActive(pet)
+	local c = Config.Pets[pet]
 	return c and c.MinWeight and c.MaxPrice and c.MinWeight > 0 and c.MaxPrice > 0
 end
 
 -- =====================
--- LOAD OBSIDIAN (CORRECT API)
+-- GUI
 -- =====================
-local Obsidian = loadstring(game:HttpGet(
-	"https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"
-))()
+if getgenv().GoonGUI then
+	getgenv().GoonGUI:Destroy()
+end
 
-local Window = Obsidian:CreateWindow("GOON SNIPER")
+local ScreenGui = Instance.new("ScreenGui", Player.PlayerGui)
+ScreenGui.Name = "GoonSniperUI"
+getgenv().GoonGUI = ScreenGui
 
-local MainTab     = Window:CreateTab("Main")
-local FiltersTab  = Window:CreateTab("Filters")
-local SafetyTab   = Window:CreateTab("Safety")
-local SettingsTab = Window:CreateTab("Settings")
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.fromOffset(300, 360)
+Main.Position = UDim2.fromScale(0.05, 0.2)
+Main.BackgroundColor3 = Color3.fromRGB(20,20,20)
+Main.Active = true
+Main.Draggable = true
+
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0,10)
+
+local function Label(text, y)
+	local l = Instance.new("TextLabel", Main)
+	l.Position = UDim2.fromOffset(10, y)
+	l.Size = UDim2.fromOffset(280, 20)
+	l.BackgroundTransparency = 1
+	l.TextXAlignment = Left
+	l.Font = Enum.Font.Code
+	l.TextSize = 13
+	l.TextColor3 = Color3.new(1,1,1)
+	l.Text = text
+	return l
+end
+
+local function Button(text, y, cb)
+	local b = Instance.new("TextButton", Main)
+	b.Position = UDim2.fromOffset(10, y)
+	b.Size = UDim2.fromOffset(280, 28)
+	b.Text = text
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 13
+	b.BackgroundColor3 = Color3.fromRGB(35,35,35)
+	b.TextColor3 = Color3.new(1,1,1)
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+	b.MouseButton1Click:Connect(cb)
+	return b
+end
+
+local function Box(placeholder, y, cb)
+	local t = Instance.new("TextBox", Main)
+	t.Position = UDim2.fromOffset(10, y)
+	t.Size = UDim2.fromOffset(280, 26)
+	t.PlaceholderText = placeholder
+	t.Text = ""
+	t.BackgroundColor3 = Color3.fromRGB(30,30,30)
+	t.TextColor3 = Color3.new(1,1,1)
+	t.Font = Enum.Font.Code
+	t.TextSize = 13
+	Instance.new("UICorner", t).CornerRadius = UDim.new(0,6)
+	t.FocusLost:Connect(function()
+		cb(t.Text)
+	end)
+	return t
+end
 
 -- =====================
--- MAIN TAB
+-- UI CONTENT
 -- =====================
-local StatusText = MainTab:AddText("Status: IDLE")
+Label("GOON SNIPER", 10)
 
-MainTab:AddToggle("Sniper Enabled", function(v)
-	getgenv().SniperEnabled = v
-	StatusText.Text = "Status: " .. (v and "SCANNING" or "IDLE")
+local StatusLabel = Label("Status: IDLE", 35)
+
+Button("Sniper Enabled", 60, function()
+	getgenv().SniperEnabled = not getgenv().SniperEnabled
+	StatusLabel.Text = "Status: " .. (getgenv().SniperEnabled and "SCANNING" or "IDLE")
 end)
 
--- =====================
--- FILTERS TAB
--- =====================
-FiltersTab:AddDropdown("Enabled Pets", ALL_PETS, true, function(list)
-	EnabledPets = {}
-	for _, p in ipairs(list) do
-		EnabledPets[p] = true
-	end
+Button("Switch Pet", 95, function()
+	local i = table.find(ALL_PETS, SelectedPet) or 1
+	i = i + 1
+	if i > #ALL_PETS then i = 1 end
+	SelectedPet = ALL_PETS[i]
 end)
 
-FiltersTab:AddDropdown("Edit Pet", ALL_PETS, false, function(p)
-	SelectedPet = p
-end)
-
-FiltersTab:AddInput("Min Weight", function(v)
+local MinBox = Box("Min Weight", 130, function(v)
 	local n = tonumber(v)
 	if n then
 		Config.Pets[SelectedPet] = Config.Pets[SelectedPet] or {}
@@ -102,7 +160,7 @@ FiltersTab:AddInput("Min Weight", function(v)
 	end
 end)
 
-FiltersTab:AddInput("Max Price", function(v)
+local MaxBox = Box("Max Price", 165, function(v)
 	local n = tonumber(v)
 	if n then
 		Config.Pets[SelectedPet] = Config.Pets[SelectedPet] or {}
@@ -111,48 +169,40 @@ FiltersTab:AddInput("Max Price", function(v)
 	end
 end)
 
-local PetStatusText = FiltersTab:AddText("Pet Status:\nNone")
-
-local function RefreshPetStatus()
-	local lines = {}
-	for p in pairs(EnabledPets) do
-		table.insert(lines, (IsPetActive(p) and "🟢 " or "🔴 ") .. p)
-	end
-	PetStatusText.Text = "Pet Status:\n" .. (#lines > 0 and table.concat(lines, "\n") or "None")
-end
-
--- =====================
--- SAFETY TAB
--- =====================
-SafetyTab:AddToggle("Safety Mode", function(v)
-	Config.SafetyMode = v
+Button("Toggle Pet Active", 200, function()
+	Config.EnabledPets[SelectedPet] = not Config.EnabledPets[SelectedPet]
 	SaveConfig()
 end)
 
--- =====================
--- SETTINGS TAB
--- =====================
-SettingsTab:AddButton("Hop Server Now", function()
+local PetStatus = Label("Pet Status:", 235)
+
+Button("Hop Server", 265, function()
 	TeleportService:Teleport(TradeWorldID, Player)
 end)
 
-SettingsTab:AddToggle("Auto Hop (60s)", function(v)
-	AutoHop = v
+Button("Toggle Auto Hop", 300, function()
+	Config.AutoHop = not Config.AutoHop
+	SaveConfig()
 end)
-
-SettingsTab:AddText("UI loaded successfully.")
 
 -- =====================
 -- LOOP
 -- =====================
 task.spawn(function()
 	while task.wait(1) do
-		if getgenv().SniperEnabled then
-			RefreshPetStatus()
-			if AutoHop and os.clock() - LastHit > 60 then
-				TeleportService:Teleport(TradeWorldID, Player)
-				LastHit = os.clock()
+		local lines = {}
+		for pet, enabled in pairs(Config.EnabledPets) do
+			if enabled then
+				table.insert(lines,
+					(IsPetActive(pet) and "🟢 " or "🔴 ") .. pet
+				)
 			end
+		end
+		PetStatus.Text = "Pet Status:\n" .. (#lines > 0 and table.concat(lines,"\n") or "None")
+
+		if getgenv().SniperEnabled and Config.AutoHop and os.clock() - LastHit > 60 then
+			TeleportService:Teleport(TradeWorldID, Player)
+			LastHit = os.clock()
 		end
 	end
 end)
