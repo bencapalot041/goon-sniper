@@ -1,233 +1,96 @@
--- GOON SNIPER — SAFE, GUI-DRIVEN, FULL VERSION
-
 -- =====================
--- MOBILE SAFE BOOT (REQUIRED)
+-- RAYFIELD UI (MOBILE SAFE)
 -- =====================
-repeat task.wait() until game:IsLoaded()
+getgenv().SniperEnabled = getgenv().SniperEnabled or false
 
-local Players = game:GetService("Players")
-local Player = Players.LocalPlayer
+local Rayfield = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua"
+))()
 
-repeat task.wait() until Player
-repeat task.wait() until Player:FindFirstChild("PlayerGui")
-task.wait(1)
+local Window = Rayfield:CreateWindow({
+    Name = "GOON SNIPER",
+    LoadingTitle = "GOON SNIPER",
+    LoadingSubtitle = "Mobile Safe Rayfield UI",
+    ConfigurationSaving = {
+        Enabled = false
+    }
+})
 
--- =====================
--- SERVICES
--- =====================
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
+-- MAIN TAB
+local MainTab = Window:CreateTab("Main", 4483362458)
 
-local TradeWorldID = 129954712878723
-local CONFIG_FILE = "goon_sniper_config.json"
+MainTab:CreateToggle({
+    Name = "Sniper Enabled",
+    CurrentValue = getgenv().SniperEnabled,
+    Callback = function(Value)
+        getgenv().SniperEnabled = Value
+    end
+})
 
--- =====================
--- GUI RESET
--- =====================
-if getgenv().GoonGUI then
-	pcall(function() getgenv().GoonGUI:Destroy() end)
-end
+local StatusLabel = MainTab:CreateParagraph({
+    Title = "Status",
+    Content = "IDLE"
+})
 
-local function IsAlive(i)
-	return i and i.Parent ~= nil
-end
+-- FILTERS TAB
+local FiltersTab = Window:CreateTab("Filters", 4483362458)
 
--- =====================
--- CONFIG
--- =====================
-local ALL_PETS = {
-	"Koi","Mimic Octopus","Peacock","Raccoon","Kitsune",
-	"Rainbow Dilophosaurus","French Fry Ferret","Pancake Mole",
-	"Sushi Bear","Spaghetti Sloth","Bagel Bunny","Frog","Mole",
-	"Echo Frog","Shiba Inu","Nihonzaru","Tanuki","Tanchozuru",
-	"Kappa","Ostrich","Capybara","Scarlet Macaw","Wasp",
-	"Tarantula Hawk","Moth","Butterfly","Disco Bee","Bee",
-	"Honey Bee","Bear Bee","Petal Bee","Queen Bee"
-}
+local SelectedPet = ALL_PETS[1]
 
-local Config = {
-	Pets = {},
-	SafetyMode = true
-}
+FiltersTab:CreateDropdown({
+    Name = "Pet",
+    Options = ALL_PETS,
+    CurrentOption = { SelectedPet },
+    Callback = function(Option)
+        SelectedPet = Option[1]
+    end
+})
 
-if isfile and isfile(CONFIG_FILE) then
-	local ok, data = pcall(function()
-		return HttpService:JSONDecode(readfile(CONFIG_FILE))
-	end)
-	if ok and data then
-		Config = data
-	end
-end
+FiltersTab:CreateInput({
+    Name = "Minimum Weight",
+    PlaceholderText = "e.g. 25",
+    Callback = function(Value)
+        Value = tonumber(Value)
+        if Value and SelectedPet then
+            Config.Pets[SelectedPet] = Config.Pets[SelectedPet] or {}
+            Config.Pets[SelectedPet].MinWeight = Value
+            SaveConfig()
+        end
+    end
+})
 
-local function SaveConfig()
-	if writefile then
-		writefile(CONFIG_FILE, HttpService:JSONEncode(Config))
-	end
-end
+FiltersTab:CreateInput({
+    Name = "Maximum Price",
+    PlaceholderText = "e.g. 500",
+    Callback = function(Value)
+        Value = tonumber(Value)
+        if Value and SelectedPet then
+            Config.Pets[SelectedPet] = Config.Pets[SelectedPet] or {}
+            Config.Pets[SelectedPet].MaxPrice = Value
+            SaveConfig()
+        end
+    end
+})
 
--- =====================
--- GUI
--- =====================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GoonSniperUI"
-ScreenGui.Parent = Player:WaitForChild("PlayerGui")
-getgenv().GoonGUI = ScreenGui
+-- SAFETY TAB
+local SafetyTab = Window:CreateTab("Safety", 4483362458)
 
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15,15,15)
-MainFrame.Size = UDim2.new(0,260,0,190)
-MainFrame.Position = UDim2.new(0.1,0,0.2,0)
-MainFrame.Active = true
-MainFrame.Draggable = true
+SafetyTab:CreateToggle({
+    Name = "Safety Mode",
+    CurrentValue = Config.SafetyMode,
+    Callback = function(Value)
+        Config.SafetyMode = Value
+        SaveConfig()
+    end
+})
 
-local function Corner(i,r)
-	local c = Instance.new("UICorner",i)
-	c.CornerRadius = UDim.new(0,r)
-end
-Corner(MainFrame,8)
+-- SETTINGS TAB
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
-local Title = Instance.new("TextLabel",MainFrame)
-Title.Size = UDim2.new(1,-20,0,30)
-Title.Position = UDim2.new(0,10,0,5)
-Title.BackgroundTransparency = 1
-Title.Font = Enum.Font.GothamBlack
-Title.Text = "GOON SNIPER"
-Title.TextSize = 18
-Title.TextColor3 = Color3.fromRGB(80,255,120)
-Title.TextXAlignment = Enum.TextXAlignment.Left
+SettingsTab:CreateParagraph({
+    Title = "Info",
+    Content = "Rayfield UI loaded successfully.\nMobile Safe."
+})
 
-local Status = Instance.new("TextLabel",MainFrame)
-Status.Position = UDim2.new(0,10,0,40)
-Status.Size = UDim2.new(1,-20,0,18)
-Status.BackgroundTransparency = 1
-Status.Font = Enum.Font.Code
-Status.TextSize = 12
-Status.TextXAlignment = Enum.TextXAlignment.Left
-Status.Text = "STATUS: IDLE"
-
--- =====================
--- CONFIG PANEL
--- =====================
-local ConfigOpen = false
-local SelectedPet = nil
-
-local ConfigBtn = Instance.new("TextButton",MainFrame)
-ConfigBtn.Position = UDim2.new(0,10,0,65)
-ConfigBtn.Size = UDim2.new(1,-20,0,25)
-ConfigBtn.Text = "OPEN CONFIG"
-ConfigBtn.Font = Enum.Font.GothamBold
-Corner(ConfigBtn,6)
-
-local PetBtn = Instance.new("TextButton",MainFrame)
-PetBtn.Position = UDim2.new(0,10,0,100)
-PetBtn.Size = UDim2.new(1,-20,0,25)
-PetBtn.Text = "SELECT PET"
-PetBtn.Visible = false
-Corner(PetBtn,6)
-
-local PetState = Instance.new("TextLabel",MainFrame)
-PetState.Position = UDim2.new(0,10,0,130)
-PetState.Size = UDim2.new(1,-20,0,18)
-PetState.BackgroundTransparency = 1
-PetState.Font = Enum.Font.Code
-PetState.TextSize = 12
-PetState.Visible = false
-
-local MinBox = Instance.new("TextBox",MainFrame)
-MinBox.Position = UDim2.new(0,10,0,150)
-MinBox.Size = UDim2.new(1,-20,0,25)
-MinBox.PlaceholderText = "Min Weight"
-MinBox.Visible = false
-Corner(MinBox,6)
-
-local MaxBox = Instance.new("TextBox",MainFrame)
-MaxBox.Position = UDim2.new(0,10,0,180)
-MaxBox.Size = UDim2.new(1,-20,0,25)
-MaxBox.PlaceholderText = "Max Price"
-MaxBox.Visible = false
-Corner(MaxBox,6)
-
-ConfigBtn.MouseButton1Click:Connect(function()
-	ConfigOpen = not ConfigOpen
-	ConfigBtn.Text = ConfigOpen and "CLOSE CONFIG" or "OPEN CONFIG"
-	PetBtn.Visible = ConfigOpen
-	PetState.Visible = ConfigOpen
-	MinBox.Visible = ConfigOpen
-	MaxBox.Visible = ConfigOpen
-	MainFrame.Size = ConfigOpen and UDim2.new(0,260,0,220) or UDim2.new(0,260,0,190)
-end)
-
-PetBtn.MouseButton1Click:Connect(function()
-	local i = table.find(ALL_PETS, SelectedPet) or 0
-	i += 1
-	if i > #ALL_PETS then i = 1 end
-	SelectedPet = ALL_PETS[i]
-	PetBtn.Text = SelectedPet
-
-	local cfg = Config.Pets[SelectedPet]
-	if cfg then
-		MinBox.Text = tostring(cfg.MinWeight or "")
-		MaxBox.Text = tostring(cfg.MaxPrice or "")
-	else
-		MinBox.Text = ""
-		MaxBox.Text = ""
-	end
-end)
-
-local function RefreshState()
-	if not SelectedPet then return end
-	local cfg = Config.Pets[SelectedPet]
-	if cfg and cfg.MinWeight > 0 and cfg.MaxPrice > 0 then
-		PetState.Text = "STATUS: ACTIVE"
-		PetState.TextColor3 = Color3.fromRGB(80,255,120)
-	else
-		PetState.Text = "STATUS: INACTIVE"
-		PetState.TextColor3 = Color3.fromRGB(255,80,80)
-	end
-end
-
-local function UpdatePet()
-	if not SelectedPet then return end
-	local w = tonumber(MinBox.Text)
-	local p = tonumber(MaxBox.Text)
-	Config.Pets[SelectedPet] = {MinWeight = w or 0, MaxPrice = p or 0}
-	SaveConfig()
-	RefreshState()
-end
-
-MinBox.FocusLost:Connect(UpdatePet)
-MaxBox.FocusLost:Connect(UpdatePet)
-
--- =====================
--- SNIPER CORE (SAFE)
--- =====================
-getgenv().SniperEnabled = true
-
-local function CanBuy(data, tokens)
-	if not Config.SafetyMode then return true end
-	if not data then return false end
-	if data.Price <= 0 then return false end
-	if data.PetMax <= 0 then return false end
-	if data.Price > tokens then return false end
-	return true
-end
-
--- =====================
--- LOOP (PLACEHOLDER)
--- =====================
-task.spawn(function()
-	while task.wait(1) do
-		if getgenv().SniperEnabled then
-			Status.Text = "STATUS: SCANNING (SAFE)"
-		end
-	end
-end)
-
--- =====================
--- ANTI AFK
--- =====================
-Player.Idled:Connect(function()
-	game:GetService("VirtualUser"):CaptureController()
-	game:GetService("VirtualUser"):ClickButton2(Vector2.new())
-end)
+-- Example status update
+StatusLabel:Set({ Content = "SCANNING" })
