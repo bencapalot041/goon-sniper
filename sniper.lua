@@ -1,13 +1,23 @@
 -- GOON SNIPER — SAFE, GUI-DRIVEN, FULL VERSION
 
 -- =====================
+-- MOBILE SAFE BOOT (REQUIRED)
+-- =====================
+repeat task.wait() until game:IsLoaded()
+
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+
+repeat task.wait() until Player
+repeat task.wait() until Player:FindFirstChild("PlayerGui")
+task.wait(1)
+
+-- =====================
 -- SERVICES
 -- =====================
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local Player = Players.LocalPlayer
 
 local TradeWorldID = 129954712878723
 local CONFIG_FILE = "goon_sniper_config.json"
@@ -85,7 +95,7 @@ Title.Font = Enum.Font.GothamBlack
 Title.Text = "GOON SNIPER"
 Title.TextSize = 18
 Title.TextColor3 = Color3.fromRGB(80,255,120)
-Title.TextXAlignment = Left
+Title.TextXAlignment = Enum.TextXAlignment.Left
 
 local Status = Instance.new("TextLabel",MainFrame)
 Status.Position = UDim2.new(0,10,0,40)
@@ -93,7 +103,7 @@ Status.Size = UDim2.new(1,-20,0,18)
 Status.BackgroundTransparency = 1
 Status.Font = Enum.Font.Code
 Status.TextSize = 12
-Status.TextXAlignment = Left
+Status.TextXAlignment = Enum.TextXAlignment.Left
 Status.Text = "STATUS: IDLE"
 
 -- =====================
