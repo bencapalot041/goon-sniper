@@ -1,6 +1,6 @@
--- =====================
--- GOON SNIPER — OBSIDIAN UI (MOBILE SAFE)
--- =====================
+-- =====================================================
+-- GOON SNIPER — OBSIDIAN UI (ANDROID SAFE)
+-- =====================================================
 
 -- ===== MOBILE SAFE BOOT =====
 repeat task.wait() until game:IsLoaded()
@@ -11,7 +11,6 @@ repeat task.wait() until Player:FindFirstChild("PlayerGui")
 task.wait(1)
 
 -- ===== SERVICES =====
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 
@@ -19,8 +18,10 @@ local HttpService = game:GetService("HttpService")
 local TradeWorldID = 129954712878723
 local CONFIG_FILE = "goon_sniper_config.json"
 
--- ===== GLOBALS =====
+-- ===== GLOBAL STATE =====
 getgenv().SniperEnabled = getgenv().SniperEnabled or false
+local AutoHop = false
+local LastHit = os.clock()
 
 -- ===== PET LIST =====
 local ALL_PETS = {
@@ -35,7 +36,7 @@ local ALL_PETS = {
 
 -- ===== CONFIG =====
 local Config = {
-	Pets = {},      -- [pet] = { MinWeight, MaxPrice }
+	Pets = {},        -- [pet] = { MinWeight, MaxPrice }
 	SafetyMode = true
 }
 
@@ -55,14 +56,11 @@ local function SaveConfig()
 end
 
 -- ===== HELPERS =====
-local EnabledPets = {} -- [pet] = true
-local LastHit = os.clock()
-local AutoHop = false
+local EnabledPets = {}
 
 local function IsPetActive(pet)
 	local c = Config.Pets[pet]
-	return c and type(c.MinWeight)=="number" and type(c.MaxPrice)=="number"
-		and c.MinWeight > 0 and c.MaxPrice > 0
+	return c and c.MinWeight and c.MaxPrice and c.MinWeight > 0 and c.MaxPrice > 0
 end
 
 -- ===== LOAD OBSIDIAN UI =====
@@ -84,36 +82,59 @@ local FiltersTab  = Window:AddTab("Filters")
 local SafetyTab   = Window:AddTab("Safety")
 local SettingsTab = Window:AddTab("Settings")
 
--- ===== MAIN TAB =====
-local StatusLabel = MainTab:AddLabel("Status: IDLE")
+-- =====================================================
+-- MAIN TAB
+-- =====================================================
+local StatusLabel = MainTab:AddParagraph({
+	Title = "Status",
+	Content = "IDLE"
+})
 
 MainTab:AddToggle({
 	Text = "Sniper Enabled",
 	Default = getgenv().SniperEnabled,
 	Callback = function(v)
 		getgenv().SniperEnabled = v
-		StatusLabel:Set("Status: " .. (v and "SCANNING" or "IDLE"))
+		StatusLabel:Set({
+			Title = "Status",
+			Content = v and "SCANNING" or "IDLE"
+		})
 	end
 })
 
--- ===== FILTERS TAB =====
+-- =====================================================
+-- FILTERS TAB
+-- =====================================================
 local SelectedPet = ALL_PETS[1]
 
 FiltersTab:AddDropdown({
 	Text = "Pets (Multi-Select)",
 	List = ALL_PETS,
 	Multi = true,
-	Callback = function(selected)
+	Callback = function(list)
 		EnabledPets = {}
-		for _, p in ipairs(selected) do
+		for _, p in ipairs(list) do
 			EnabledPets[p] = true
 		end
 		RefreshPetStatus()
 	end
 })
 
+FiltersTab:AddDropdown({
+	Text = "Edit Pet",
+	List = ALL_PETS,
+	Default = SelectedPet,
+	Callback = function(p)
+		SelectedPet = p
+		local c = Config.Pets[p]
+		MinWeightBox:SetText(c and tostring(c.MinWeight or "") or "")
+		MaxPriceBox:SetText(c and tostring(c.MaxPrice or "") or "")
+		RefreshPetStatus()
+	end
+})
+
 local MinWeightBox = FiltersTab:AddInput({
-	Text = "Minimum Weight (Edit Selected Pet)",
+	Text = "Minimum Weight",
 	Placeholder = "e.g. 25",
 	Callback = function(v)
 		local n = tonumber(v)
@@ -127,7 +148,7 @@ local MinWeightBox = FiltersTab:AddInput({
 })
 
 local MaxPriceBox = FiltersTab:AddInput({
-	Text = "Maximum Price (Edit Selected Pet)",
+	Text = "Maximum Price",
 	Placeholder = "e.g. 500",
 	Callback = function(v)
 		local n = tonumber(v)
@@ -140,36 +161,29 @@ local MaxPriceBox = FiltersTab:AddInput({
 	end
 })
 
-FiltersTab:AddDropdown({
-	Text = "Edit Pet",
-	List = ALL_PETS,
-	Default = SelectedPet,
-	Callback = function(v)
-		SelectedPet = v
-		local c = Config.Pets[v]
-		MinWeightBox:SetText(c and tostring(c.MinWeight or "") or "")
-		MaxPriceBox:SetText(c and tostring(c.MaxPrice or "") or "")
-		RefreshPetStatus()
-	end
+local StatusList = FiltersTab:AddParagraph({
+	Title = "Pet Status",
+	Content = "No pets selected"
 })
-
-local StatusList = FiltersTab:AddLabel("Pet Status:")
 
 function RefreshPetStatus()
 	local lines = {}
-	for _, pet in ipairs(ALL_PETS) do
-		if EnabledPets[pet] then
-			if IsPetActive(pet) then
-				table.insert(lines, "🟢 "..pet.." (ACTIVE)")
-			else
-				table.insert(lines, "🔴 "..pet.." (INACTIVE)")
-			end
+	for pet in pairs(EnabledPets) do
+		if IsPetActive(pet) then
+			table.insert(lines, "🟢 "..pet.." (ACTIVE)")
+		else
+			table.insert(lines, "🔴 "..pet.." (INACTIVE)")
 		end
 	end
-	StatusList:Set(#lines > 0 and table.concat(lines, "\n") or "No pets selected")
+	StatusList:Set({
+		Title = "Pet Status",
+		Content = #lines > 0 and table.concat(lines, "\n") or "No pets selected"
+	})
 end
 
--- ===== SAFETY TAB =====
+-- =====================================================
+-- SAFETY TAB
+-- =====================================================
 SafetyTab:AddToggle({
 	Text = "Safety Mode",
 	Default = Config.SafetyMode,
@@ -179,7 +193,9 @@ SafetyTab:AddToggle({
 	end
 })
 
--- ===== SETTINGS TAB =====
+-- =====================================================
+-- SETTINGS TAB
+-- =====================================================
 SettingsTab:AddButton({
 	Text = "Hop Server Now",
 	Callback = function()
@@ -195,9 +211,14 @@ SettingsTab:AddToggle({
 	end
 })
 
-SettingsTab:AddLabel("Obsidian UI loaded successfully.")
+SettingsTab:AddParagraph({
+	Title = "Info",
+	Content = "Obsidian UI loaded successfully."
+})
 
--- ===== NOTIFICATIONS =====
+-- =====================================================
+-- NOTIFICATIONS
+-- =====================================================
 local function NotifySnipe(pet, weight, price)
 	Obsidian:Notify({
 		Title = "SNIPED!",
@@ -208,33 +229,27 @@ local function NotifySnipe(pet, weight, price)
 	})
 end
 
--- ===== SAFETY CHECK =====
-local function CanBuy(data, tokens)
-	if not Config.SafetyMode then return true end
-	if not data then return false end
-	if data.Price <= 0 then return false end
-	if data.PetMax <= 0 then return false end
-	if data.Price > tokens then return false end
-	return true
-end
-
--- ===== PLACEHOLDER LOOP (HOOK YOUR REAL SNIPER HERE) =====
+-- =====================================================
+-- MAIN LOOP (HOOK YOUR REAL SNIPER HERE)
+-- =====================================================
 task.spawn(function()
 	while task.wait(1) do
 		if getgenv().SniperEnabled then
-			StatusLabel:Set("Status: SCANNING")
-			-- Auto hop if enabled
+			StatusLabel:Set({ Title="Status", Content="SCANNING" })
+
 			if AutoHop and os.clock() - LastHit > 60 then
 				TeleportService:Teleport(TradeWorldID, Player)
 				LastHit = os.clock()
 			end
 		else
-			StatusLabel:Set("Status: IDLE")
+			StatusLabel:Set({ Title="Status", Content="IDLE" })
 		end
 	end
 end)
 
--- ===== ANTI-AFK =====
+-- =====================================================
+-- ANTI-AFK
+-- =====================================================
 Player.Idled:Connect(function()
 	game:GetService("VirtualUser"):CaptureController()
 	game:GetService("VirtualUser"):ClickButton2(Vector2.new())
