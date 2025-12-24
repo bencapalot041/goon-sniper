@@ -1,117 +1,161 @@
--- =====================================================
--- GOON SNIPER — FINAL ANDROID-SAFE UI (NO LIBRARIES)
--- =====================================================
+-- [6] OBSIDIAN UI (POST-AUTH, MOBILE + PC SAFE)
+local function LoadSniperUI()
+    local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+    local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+    local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+    local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
-repeat task.wait() until game:IsLoaded()
+    local Options = Library.Options
+    local Toggles = Library.Toggles
 
--- =====================
--- SERVICES
--- =====================
-local Players = game:GetService("Players")
-local Player = Players.LocalPlayer
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
-local VirtualUser = game:GetService("VirtualUser")
+    local Window = Library:CreateWindow({
+        Title = "GOON SNIPER",
+        Footer = Version,
+        NotifySide = "Right",
+        ShowCustomCursor = true,
+    })
 
-repeat task.wait() until Player and Player:FindFirstChild("PlayerGui")
+    local Tabs = {
+        Main = Window:AddTab("Main", "crosshair"),
+        Filters = Window:AddTab("Filters", "list"),
+        Safety = Window:AddTab("Safety", "shield"),
+        Key = Window:AddKeyTab("Key System"),
+        UI = Window:AddTab("UI Settings", "settings"),
+    }
 
--- =====================
--- CONSTANTS
--- =====================
-local TradeWorldID = 129954712878723
-local CONFIG_FILE = "goon_sniper_config.json"
+    -- =====================
+    -- MAIN TAB
+    -- =====================
+    local MainBox = Tabs.Main:AddLeftGroupbox("Sniper Control")
 
--- =====================
--- PET LIST
--- =====================
-local ALL_PETS = {
-	"Koi","Mimic Octopus","Peacock","Raccoon","Kitsune",
-	"Rainbow Dilophosaurus","French Fry Ferret","Pancake Mole",
-	"Sushi Bear","Spaghetti Sloth","Bagel Bunny","Frog","Mole",
-	"Echo Frog","Shiba Inu","Nihonzaru","Tanuki","Tanchozuru",
-	"Kappa","Ostrich","Capybara","Scarlet Macaw","Wasp",
-	"Tarantula Hawk","Moth","Butterfly","Disco Bee","Bee",
-	"Honey Bee","Bear Bee","Petal Bee","Queen Bee"
-}
+    MainBox:AddToggle("SniperEnabled", {
+        Text = "Enable Sniper",
+        Default = getgenv().SniperEnabled,
+        Callback = function(v)
+            getgenv().SniperEnabled = v
+            SaveConfig()
+        end,
+    })
 
--- =====================
--- CONFIG
--- =====================
-local Config = {
-	Pets = {},
-	EnabledPets = {},
-	AutoHop = false
-}
+    MainBox:AddButton("Force Server Hop", function()
+        Hop()
+    end)
 
-if isfile and isfile(CONFIG_FILE) then
-	pcall(function()
-		Config = HttpService:JSONDecode(readfile(CONFIG_FILE))
-	end)
+    MainBox:AddLabel("Status: Controlled by sniper loop")
+
+    -- =====================
+    -- FILTERS TAB
+    -- =====================
+    local FilterBox = Tabs.Filters:AddLeftGroupbox("Pet Filters")
+
+    FilterBox:AddDropdown("PetSelect", {
+        Text = "Select Pets",
+        Values = PetList,
+        Multi = true,
+        Searchable = true,
+        Callback = function(tbl)
+            for pet, enabled in pairs(tbl) do
+                if enabled and not getgenv().CurrentFilters[pet] then
+                    getgenv().CurrentFilters[pet] = {0, 9999999}
+                elseif not enabled then
+                    getgenv().CurrentFilters[pet] = nil
+                end
+            end
+            SaveConfig()
+        end,
+    })
+
+    FilterBox:AddInput("MinWeight", {
+        Text = "Min Weight",
+        Numeric = true,
+        Callback = function(v)
+            v = tonumber(v)
+            if not v then return end
+            for pet,_ in pairs(getgenv().CurrentFilters) do
+                getgenv().CurrentFilters[pet][1] = v
+            end
+            SaveConfig()
+        end,
+    })
+
+    FilterBox:AddInput("MaxPrice", {
+        Text = "Max Price",
+        Numeric = true,
+        Callback = function(v)
+            v = tonumber(v)
+            if not v then return end
+            for pet,_ in pairs(getgenv().CurrentFilters) do
+                getgenv().CurrentFilters[pet][2] = v
+            end
+            SaveConfig()
+        end,
+    })
+
+    -- =====================
+    -- SAFETY TAB
+    -- =====================
+    local SafetyBox = Tabs.Safety:AddLeftGroupbox("Safety")
+
+    SafetyBox:AddInput("Webhook", {
+        Text = "Discord Webhook",
+        Default = getgenv().WebhookURL,
+        Callback = function(v)
+            getgenv().WebhookURL = v
+            SaveConfig()
+        end,
+    })
+
+    SafetyBox:AddSlider("HopDelay", {
+        Text = "Auto-Hop Delay",
+        Min = 30,
+        Max = 300,
+        Default = getgenv().HopDelay or 60,
+        Suffix = "s",
+        Callback = function(v)
+            getgenv().HopDelay = v
+            SaveConfig()
+        end,
+    })
+
+    -- =====================
+    -- KEY TAB (REPLACES OLD KEY UI)
+    -- =====================
+    Tabs.Key:AddLabel({
+        Text = "Enter your access key below",
+        DoesWrap = true,
+    })
+
+    Tabs.Key:AddKeyBox(function(key)
+        if ValidateKey(key) then
+            if writefile then writefile(KeyFile, key) end
+            Library:Notify({
+                Title = "Access Granted",
+                Description = "Key accepted",
+                Time = 3,
+            })
+        else
+            Library:Notify({
+                Title = "Invalid Key",
+                Description = "Key rejected",
+                Time = 3,
+            })
+        end
+    end)
+
+    -- =====================
+    -- UI SETTINGS
+    -- =====================
+    ThemeManager:SetLibrary(Library)
+    SaveManager:SetLibrary(Library)
+
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetIgnoreIndexes({})
+
+    ThemeManager:SetFolder("GoonSniper")
+    SaveManager:SetFolder("GoonSniper/Configs")
+
+    SaveManager:BuildConfigSection(Tabs.UI)
+    ThemeManager:ApplyToTab(Tabs.UI)
+
+    SaveManager:LoadAutoloadConfig()
 end
-
-local function SaveConfig()
-	if writefile then
-		writefile(CONFIG_FILE, HttpService:JSONEncode(Config))
-	end
-end
-
--- =====================
--- STATE
--- =====================
-getgenv().SniperEnabled = false
-local SelectedPet = ALL_PETS[1]
-local LastHit = os.clock()
-
-local function IsPetActive(pet)
-	local c = Config.Pets[pet]
-	return c and c.MinWeight and c.MaxPrice and c.MinWeight > 0 and c.MaxPrice > 0
-end
-
--- =====================
--- GUI RESET
--- =====================
-if getgenv().GoonGUI then
-	getgenv().GoonGUI:Destroy()
-end
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GoonSniperUI"
-ScreenGui.Parent = Player.PlayerGui
-getgenv().GoonGUI = ScreenGui
-
--- =====================
--- MAIN FRAME
--- =====================
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.fromOffset(300, 360)
-Main.Position = UDim2.fromScale(0.05, 0.2)
-Main.BackgroundColor3 = Color3.fromRGB(20,20,20)
-Main.Active = true
-Main.Draggable = true
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0,10)
-
--- =====================
--- UI HELPERS
--- =====================
-local function Label(text, y)
-	local l = Instance.new("TextLabel", Main)
-	l.Position = UDim2.fromOffset(10, y)
-	l.Size = UDim2.fromOffset(280, 20)
-	l.BackgroundTransparency = 1
-	l.TextXAlignment = Enum.TextXAlignment.Left -- FIXED
-	l.TextYAlignment = Enum.TextYAlignment.Center
-	l.Font = Enum.Font.Code
-	l.TextSize = 13
-	l.TextColor3 = Color3.new(1,1,1)
-	l.Text = text
-	return l
-end
-
-local function Button(text, y, cb)
-	local b = Instance.new("TextButton", Main)
-	b.Position = UDim2.fromOffset(10, y)
-	b.Size = UDim2.fromOffset(280, 28)
-	b.Text = text
-	b.Font = Enum.Font.GothamBold
-	b.TextSize = 13
-	b.Back
