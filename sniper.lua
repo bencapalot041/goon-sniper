@@ -1,30 +1,26 @@
 -- =====================================================
--- GOON SNIPER — OBSIDIAN UI (EXAMPLE.LUA API)
+-- GOON SNIPER — OBSIDIAN UI (STABLE / ANDROID SAFE)
 -- =====================================================
 
--- ===== MOBILE SAFE BOOT =====
 repeat task.wait() until game:IsLoaded()
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
-repeat task.wait() until Player
-repeat task.wait() until Player:FindFirstChild("PlayerGui")
-task.wait(1)
+repeat task.wait() until Player and Player:FindFirstChild("PlayerGui")
 
--- ===== SERVICES =====
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local VirtualUser = game:GetService("VirtualUser")
 
--- ===== CONSTANTS =====
 local TradeWorldID = 129954712878723
 local CONFIG_FILE = "goon_sniper_config.json"
 
--- ===== STATE =====
 getgenv().SniperEnabled = false
 local AutoHop = false
 local LastHit = os.clock()
 
--- ===== PET LIST =====
+-- =====================
+-- PET LIST
+-- =====================
 local ALL_PETS = {
 	"Koi","Mimic Octopus","Peacock","Raccoon","Kitsune",
 	"Rainbow Dilophosaurus","French Fry Ferret","Pancake Mole",
@@ -35,9 +31,10 @@ local ALL_PETS = {
 	"Honey Bee","Bear Bee","Petal Bee","Queen Bee"
 }
 
--- ===== CONFIG =====
+-- =====================
+-- CONFIG
+-- =====================
 local Config = { Pets = {}, SafetyMode = true }
-
 if isfile and isfile(CONFIG_FILE) then
 	pcall(function()
 		Config = HttpService:JSONDecode(readfile(CONFIG_FILE))
@@ -50,7 +47,6 @@ local function SaveConfig()
 	end
 end
 
--- ===== HELPERS =====
 local EnabledPets = {}
 local SelectedPet = ALL_PETS[1]
 
@@ -59,7 +55,9 @@ local function IsPetActive(p)
 	return c and c.MinWeight and c.MaxPrice and c.MinWeight > 0 and c.MaxPrice > 0
 end
 
--- ===== LOAD OBSIDIAN (MATCH EXAMPLE.LUA) =====
+-- =====================
+-- LOAD OBSIDIAN (CORRECT API)
+-- =====================
 local Obsidian = loadstring(game:HttpGet(
 	"https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Example.lua"
 ))()
@@ -71,7 +69,9 @@ local FiltersTab  = Window:CreateTab("Filters")
 local SafetyTab   = Window:CreateTab("Safety")
 local SettingsTab = Window:CreateTab("Settings")
 
--- ===== MAIN TAB =====
+-- =====================
+-- MAIN TAB
+-- =====================
 local StatusText = MainTab:AddText("Status: IDLE")
 
 MainTab:AddToggle("Sniper Enabled", function(v)
@@ -79,7 +79,9 @@ MainTab:AddToggle("Sniper Enabled", function(v)
 	StatusText.Text = "Status: " .. (v and "SCANNING" or "IDLE")
 end)
 
--- ===== FILTERS TAB =====
+-- =====================
+-- FILTERS TAB
+-- =====================
 FiltersTab:AddDropdown("Enabled Pets", ALL_PETS, true, function(list)
 	EnabledPets = {}
 	for _, p in ipairs(list) do
@@ -119,13 +121,17 @@ local function RefreshPetStatus()
 	PetStatusText.Text = "Pet Status:\n" .. (#lines > 0 and table.concat(lines, "\n") or "None")
 end
 
--- ===== SAFETY TAB =====
+-- =====================
+-- SAFETY TAB
+-- =====================
 SafetyTab:AddToggle("Safety Mode", function(v)
 	Config.SafetyMode = v
 	SaveConfig()
 end)
 
--- ===== SETTINGS TAB =====
+-- =====================
+-- SETTINGS TAB
+-- =====================
 SettingsTab:AddButton("Hop Server Now", function()
 	TeleportService:Teleport(TradeWorldID, Player)
 end)
@@ -134,9 +140,11 @@ SettingsTab:AddToggle("Auto Hop (60s)", function(v)
 	AutoHop = v
 end)
 
-SettingsTab:AddText("Obsidian UI loaded successfully.")
+SettingsTab:AddText("UI loaded successfully.")
 
--- ===== LOOP =====
+-- =====================
+-- LOOP
+-- =====================
 task.spawn(function()
 	while task.wait(1) do
 		if getgenv().SniperEnabled then
@@ -149,7 +157,9 @@ task.spawn(function()
 	end
 end)
 
--- ===== ANTI AFK =====
+-- =====================
+-- ANTI AFK
+-- =====================
 Player.Idled:Connect(function()
 	VirtualUser:CaptureController()
 	VirtualUser:ClickButton2(Vector2.new())
